@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -13,6 +14,18 @@ import (
 	"claude-meter-proxy/internal/storage"
 )
 
+type rawWriter interface {
+	Write(capture.CompletedExchange) error
+}
+
+type normalizedWriter interface {
+	Write(normalize.Record) error
+}
+
+type normalizer interface {
+	Normalize(capture.CompletedExchange) normalize.Record
+}
+
 type Config struct {
 	UpstreamBaseURL *url.URL
 	LogDir          string
@@ -22,8 +35,11 @@ type Config struct {
 }
 
 type App struct {
-	proxy     *proxy.Server
-	exchanges chan capture.CompletedExchange
+	proxy            *proxy.Server
+	exchanges        chan capture.CompletedExchange
+	rawWriter        rawWriter
+	normalizedWriter normalizedWriter
+	normalizer       normalizer
 
 	closeOnce sync.Once
 	wg        sync.WaitGroup
@@ -40,19 +56,22 @@ func New(cfg Config) (*App, error) {
 		cfg.QueueSize = 256
 	}
 
-	rawWriter, err := storage.NewRawExchangeWriter(filepath.Join(cfg.LogDir, "raw"))
+	rw, err := storage.NewRawExchangeWriter(filepath.Join(cfg.LogDir, "raw"))
 	if err != nil {
 		return nil, err
 	}
-	normalizedWriter, err := storage.NewNormalizedRecordWriter(filepath.Join(cfg.LogDir, "normalized"))
+	nw, err := storage.NewNormalizedRecordWriter(filepath.Join(cfg.LogDir, "normalized"))
 	if err != nil {
 		return nil, err
 	}
-	normalizer := normalize.New(cfg.PlanTier)
+	norm := normalize.New(cfg.PlanTier)
 
 	exchanges := make(chan capture.CompletedExchange, cfg.QueueSize)
 	app := &App{
-		exchanges: exchanges,
+		exchanges:        exchanges,
+		rawWriter:        rw,
+		normalizedWriter: nw,
+		normalizer:       norm,
 	}
 
 	app.proxy = proxy.New(proxy.Config{
@@ -61,16 +80,34 @@ func New(cfg Config) (*App, error) {
 		CaptureCh:       exchanges,
 	})
 
-	app.wg.Add(1)
+	app.startBackgroundWriter()
+
+	return app, nil
+}
+
+func (a *App) startBackgroundWriter() {
+	a.wg.Add(1)
 	go func() {
-		defer app.wg.Done()
-		for exchange := range exchanges {
-			_ = rawWriter.Write(exchange)
-			_ = normalizedWriter.Write(normalizer.Normalize(exchange))
+		defer a.wg.Done()
+		for ex := range a.exchanges {
+			a.processExchange(ex)
+		}
+	}()
+}
+
+func (a *App) processExchange(ex capture.CompletedExchange) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("claude-meter: recovered panic processing exchange %d: %v", ex.ID, r)
 		}
 	}()
 
-	return app, nil
+	if err := a.rawWriter.Write(ex); err != nil {
+		log.Printf("claude-meter: raw write error for exchange %d: %v", ex.ID, err)
+	}
+	if err := a.normalizedWriter.Write(a.normalizer.Normalize(ex)); err != nil {
+		log.Printf("claude-meter: normalized write error for exchange %d: %v", ex.ID, err)
+	}
 }
 
 func (a *App) Handler() http.Handler {

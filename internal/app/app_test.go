@@ -2,14 +2,18 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"claude-meter-proxy/internal/capture"
 	"claude-meter-proxy/internal/normalize"
 )
 
@@ -146,5 +150,143 @@ func TestAppWritesNormalizedRecordLog(t *testing.T) {
 	}
 	if got.SessionID != "session_123" {
 		t.Fatalf("SessionID = %q, want %q", got.SessionID, "session_123")
+	}
+}
+
+// --- mock types for unit tests ---
+
+type mockRawWriter struct {
+	mu       sync.Mutex
+	calls    []capture.CompletedExchange
+	writeFn  func(capture.CompletedExchange) error
+}
+
+func (m *mockRawWriter) Write(ex capture.CompletedExchange) error {
+	m.mu.Lock()
+	m.calls = append(m.calls, ex)
+	m.mu.Unlock()
+	if m.writeFn != nil {
+		return m.writeFn(ex)
+	}
+	return nil
+}
+
+type mockNormalizedWriter struct {
+	mu       sync.Mutex
+	calls    []normalize.Record
+	writeFn  func(normalize.Record) error
+}
+
+func (m *mockNormalizedWriter) Write(rec normalize.Record) error {
+	m.mu.Lock()
+	m.calls = append(m.calls, rec)
+	m.mu.Unlock()
+	if m.writeFn != nil {
+		return m.writeFn(rec)
+	}
+	return nil
+}
+
+type mockNormalizer struct {
+	normalizeFn func(capture.CompletedExchange) normalize.Record
+}
+
+func (m *mockNormalizer) Normalize(ex capture.CompletedExchange) normalize.Record {
+	if m.normalizeFn != nil {
+		return m.normalizeFn(ex)
+	}
+	return normalize.Record{ID: ex.ID}
+}
+
+func newTestApp(rw rawWriter, nw normalizedWriter, norm normalizer) *App {
+	ch := make(chan capture.CompletedExchange, 8)
+	a := &App{
+		exchanges:        ch,
+		rawWriter:        rw,
+		normalizedWriter: nw,
+		normalizer:       norm,
+	}
+	a.startBackgroundWriter()
+	return a
+}
+
+func TestBackgroundWriterLogsWriteError(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{
+		writeFn: func(ex capture.CompletedExchange) error {
+			return fmt.Errorf("disk full")
+		},
+	}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{}
+
+	a := newTestApp(rw, nw, norm)
+
+	now := time.Now()
+	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: now}
+	a.exchanges <- capture.CompletedExchange{ID: 2, RequestStartedAt: now}
+	a.exchanges <- capture.CompletedExchange{ID: 3, RequestStartedAt: now}
+
+	if err := a.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	// Even though raw writer returned errors, all three exchanges should have
+	// been processed (goroutine did not die).
+	rw.mu.Lock()
+	rawCount := len(rw.calls)
+	rw.mu.Unlock()
+	if rawCount != 3 {
+		t.Fatalf("raw writer called %d times, want 3", rawCount)
+	}
+
+	nw.mu.Lock()
+	normCount := len(nw.calls)
+	nw.mu.Unlock()
+	if normCount != 3 {
+		t.Fatalf("normalized writer called %d times, want 3", normCount)
+	}
+}
+
+func TestBackgroundWriterRecoverFromNormalizePanic(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{
+		normalizeFn: func(ex capture.CompletedExchange) normalize.Record {
+			if ex.ID == 2 {
+				panic("unexpected nil pointer in normalizer")
+			}
+			return normalize.Record{ID: ex.ID}
+		},
+	}
+
+	a := newTestApp(rw, nw, norm)
+
+	now := time.Now()
+	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: now}
+	a.exchanges <- capture.CompletedExchange{ID: 2, RequestStartedAt: now} // will panic
+	a.exchanges <- capture.CompletedExchange{ID: 3, RequestStartedAt: now}
+
+	if err := a.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	// All three exchanges should reach the raw writer. Exchange 2 panics during
+	// normalization, so its normalized write is skipped, but 1 and 3 succeed.
+	rw.mu.Lock()
+	rawCount := len(rw.calls)
+	rw.mu.Unlock()
+	if rawCount != 3 {
+		t.Fatalf("raw writer called %d times, want 3", rawCount)
+	}
+
+	nw.mu.Lock()
+	normCount := len(nw.calls)
+	nw.mu.Unlock()
+	if normCount != 2 {
+		t.Fatalf("normalized writer called %d times, want 2", normCount)
 	}
 }
