@@ -697,5 +697,171 @@ class TestAnalyzeNormalizedLog(unittest.TestCase):
         )
 
 
+    def test_build_utilization_time_series_extracts_ordered_pairs(self):
+        records = [
+            {
+                "id": 1,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:05:00.000+00:00",
+                "ratelimit": {"windows": {"5h": {"utilization": 0.30}}},
+            },
+            {
+                "id": 2,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:00:00.000+00:00",
+                "ratelimit": {"windows": {"5h": {"utilization": 0.10}}},
+            },
+            {
+                "id": 3,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:02:00.000+00:00",
+                "ratelimit": {"windows": {"5h": {"utilization": 0.20}}},
+            },
+            {
+                "id": 4,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:06:00.000+00:00",
+                "ratelimit": {"windows": {"7d": {"utilization": 0.50}}},
+            },
+        ]
+
+        ts = analyzer.build_utilization_time_series(records, window="5h")
+
+        self.assertEqual(len(ts), 3)
+        self.assertEqual(
+            [entry["utilization"] for entry in ts],
+            [0.10, 0.20, 0.30],
+        )
+        self.assertEqual(ts[0]["timestamp"], "2026-03-25T22:00:00.000+00:00")
+        self.assertEqual(ts[1]["timestamp"], "2026-03-25T22:02:00.000+00:00")
+        self.assertEqual(ts[2]["timestamp"], "2026-03-25T22:05:00.000+00:00")
+
+    def test_detect_resets_finds_large_drops(self):
+        time_series = [
+            {"timestamp": "2026-03-25T22:00:00.000+00:00", "utilization": 0.50},
+            {"timestamp": "2026-03-25T22:05:00.000+00:00", "utilization": 0.60},
+            {"timestamp": "2026-03-25T22:10:00.000+00:00", "utilization": 0.10},
+            {"timestamp": "2026-03-25T22:15:00.000+00:00", "utilization": 0.20},
+        ]
+
+        resets = analyzer.detect_resets(time_series, threshold=0.10)
+
+        self.assertEqual(len(resets), 1)
+        self.assertEqual(resets[0]["timestamp"], "2026-03-25T22:10:00.000+00:00")
+        self.assertAlmostEqual(resets[0]["pre_utilization"], 0.60)
+        self.assertAlmostEqual(resets[0]["post_utilization"], 0.10)
+        self.assertEqual(resets[0]["elapsed_seconds_since_prior"], 300.0)
+
+    def test_detect_resets_ignores_small_drops(self):
+        time_series = [
+            {"timestamp": "2026-03-25T22:00:00.000+00:00", "utilization": 0.50},
+            {"timestamp": "2026-03-25T22:05:00.000+00:00", "utilization": 0.45},
+            {"timestamp": "2026-03-25T22:10:00.000+00:00", "utilization": 0.55},
+        ]
+
+        resets = analyzer.detect_resets(time_series, threshold=0.10)
+
+        self.assertEqual(resets, [])
+
+    def test_build_raw_vs_weighted_ratios(self):
+        records = [
+            {
+                "id": 1,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:00:00.000+00:00",
+                "response_model": "claude-opus-4-6",
+                "usage": {
+                    "input_tokens": 10,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "output_tokens": 0,
+                },
+                "ratelimit": {"windows": {"5h": {"utilization": 0.10}}},
+            },
+            {
+                "id": 2,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:05:00.000+00:00",
+                "response_model": "claude-opus-4-6",
+                "usage": {
+                    "input_tokens": 20,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "output_tokens": 10,
+                },
+                "ratelimit": {"windows": {"5h": {"utilization": 0.20}}},
+            },
+            {
+                "id": 3,
+                "status": 200,
+                "response_timestamp": "2026-03-25T22:10:00.000+00:00",
+                "response_model": "claude-opus-4-6",
+                "usage": {
+                    "input_tokens": 5,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                    "output_tokens": 5,
+                },
+                "ratelimit": {"windows": {"5h": {"utilization": 0.15}}},
+            },
+        ]
+
+        ratios = analyzer.build_raw_vs_weighted_ratios(records, window="5h")
+
+        self.assertEqual(len(ratios), 1)
+        self.assertEqual(ratios[0]["timestamp"], "2026-03-25T22:05:00.000+00:00")
+        self.assertEqual(ratios[0]["raw_tokens"], 30)
+        self.assertEqual(ratios[0]["weighted_tokens"], 350.0)
+        self.assertAlmostEqual(ratios[0]["ratio"], 30 / 350.0)
+
+    def test_build_per_model_caps_groups_by_model(self):
+        records = [
+            {
+                "id": 1,
+                "request_timestamp": "2026-03-25T22:00:00.000+00:00",
+                "status": 200,
+                "declared_plan_tier": "max_20x",
+                "response_model": "claude-opus-4-6",
+                "usage": {"input_tokens": 100, "output_tokens": 0},
+                "ratelimit": {"windows": {"5h": {"utilization": 0.10}}},
+            },
+            {
+                "id": 2,
+                "request_timestamp": "2026-03-25T22:01:00.000+00:00",
+                "status": 200,
+                "declared_plan_tier": "max_20x",
+                "response_model": "claude-opus-4-6",
+                "usage": {"input_tokens": 200, "output_tokens": 0},
+                "ratelimit": {"windows": {"5h": {"utilization": 0.11}}},
+            },
+            {
+                "id": 3,
+                "request_timestamp": "2026-03-25T22:02:00.000+00:00",
+                "status": 200,
+                "declared_plan_tier": "max_20x",
+                "response_model": "claude-sonnet-4-6",
+                "usage": {"input_tokens": 50, "output_tokens": 0},
+                "ratelimit": {"windows": {"5h": {"utilization": 0.11}}},
+            },
+            {
+                "id": 4,
+                "request_timestamp": "2026-03-25T22:03:00.000+00:00",
+                "status": 200,
+                "declared_plan_tier": "max_20x",
+                "response_model": "claude-sonnet-4-6",
+                "usage": {"input_tokens": 100, "output_tokens": 0},
+                "ratelimit": {"windows": {"5h": {"utilization": 0.12}}},
+            },
+        ]
+
+        caps = analyzer.build_per_model_caps(records, window="5h", meter="price_equivalent_5m")
+
+        self.assertIn("claude-opus-4-6", caps)
+        self.assertIn("claude-sonnet-4-6", caps)
+        self.assertEqual(len(caps), 2)
+        self.assertIsInstance(caps["claude-opus-4-6"], float)
+        self.assertIsInstance(caps["claude-sonnet-4-6"], float)
+
+
 if __name__ == "__main__":
     unittest.main()

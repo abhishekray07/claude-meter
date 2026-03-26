@@ -471,8 +471,100 @@ def build_estimate_band(records, window="5h", meter="price_equivalent_5m"):
     }
 
 
+def build_utilization_time_series(records, window="5h"):
+    pairs = []
+    for record in records:
+        windows = ((record.get("ratelimit") or {}).get("windows") or {})
+        if window not in windows:
+            continue
+        utilization = windows[window].get("utilization")
+        if not isinstance(utilization, (int, float)):
+            continue
+        ts = record.get("response_timestamp") or ""
+        if not ts:
+            continue
+        pairs.append({"timestamp": ts, "utilization": utilization})
+    pairs.sort(key=lambda p: p["timestamp"])
+    return pairs
+
+
+def detect_resets(time_series, threshold=0.10):
+    resets = []
+    for i in range(1, len(time_series)):
+        prev = time_series[i - 1]
+        curr = time_series[i]
+        drop = prev["utilization"] - curr["utilization"]
+        if drop >= threshold:
+            prev_dt = _parse_iso_timestamp(prev["timestamp"])
+            curr_dt = _parse_iso_timestamp(curr["timestamp"])
+            elapsed = None
+            if prev_dt is not None and curr_dt is not None:
+                elapsed = (curr_dt - prev_dt).total_seconds()
+            resets.append({
+                "timestamp": curr["timestamp"],
+                "pre_utilization": prev["utilization"],
+                "post_utilization": curr["utilization"],
+                "elapsed_seconds_since_prior": elapsed,
+            })
+    return resets
+
+
+def build_raw_vs_weighted_ratios(records, window="5h"):
+    eligible = []
+    for record in records:
+        windows = ((record.get("ratelimit") or {}).get("windows") or {})
+        if window not in windows:
+            continue
+        utilization = windows[window].get("utilization")
+        if not isinstance(utilization, (int, float)):
+            continue
+        ts = record.get("response_timestamp") or ""
+        if not ts:
+            continue
+        eligible.append((ts, utilization, record))
+    eligible.sort(key=lambda t: t[0])
+
+    ratios = []
+    for i in range(1, len(eligible)):
+        prev_ts, prev_util, prev_rec = eligible[i - 1]
+        curr_ts, curr_util, curr_rec = eligible[i]
+        if curr_util <= prev_util:
+            continue
+        raw = usage_value(curr_rec, meter="effective_tokens_raw")
+        weighted = usage_value(curr_rec, meter="price_equivalent_5m")
+        ratio = raw / weighted if weighted != 0 else None
+        ratios.append({
+            "timestamp": curr_ts,
+            "raw_tokens": raw,
+            "weighted_tokens": weighted,
+            "ratio": ratio,
+        })
+    return ratios
+
+
+def build_per_model_caps(records, window="5h", meter="price_equivalent_5m"):
+    intervals = build_utilization_intervals(records, meter=meter)
+    model_caps = {}
+    for interval in intervals:
+        if interval.get("window") != window:
+            continue
+        models = interval.get("models") or []
+        if len(models) != 1:
+            continue
+        cap = interval.get("implied_cap")
+        if not isinstance(cap, (int, float)):
+            continue
+        model_name = models[0]
+        model_caps.setdefault(model_name, []).append(cap)
+    result = {}
+    for model_name, caps in model_caps.items():
+        result[model_name] = statistics.median(caps)
+    return result
+
+
 def render_analysis(log_path):
     records = list(load_records(log_path))
+    time_series = build_utilization_time_series(records, window="5h")
     summary = {
         "record_count": len(records),
         "window_summary": summarize_windows(records),
@@ -480,6 +572,10 @@ def render_analysis(log_path):
         "interval_estimates": build_utilization_intervals(records),
         "meter_comparison": build_meter_comparison(records),
         "estimate_band": build_estimate_band(records),
+        "utilization_time_series": time_series,
+        "resets": detect_resets(time_series),
+        "raw_vs_weighted_ratios": build_raw_vs_weighted_ratios(records),
+        "per_model_caps": build_per_model_caps(records),
     }
     return json.dumps(summary, sort_keys=True)
 
