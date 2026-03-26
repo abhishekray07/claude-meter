@@ -78,10 +78,6 @@ def usage_value(record, meter="effective_tokens_raw", cache_read_weight=1.0):
     raise ValueError(f"unknown usage meter: {meter}")
 
 
-def _effective_tokens(record):
-    return usage_value(record, meter="effective_tokens_raw")
-
-
 def _numeric_usage_value(value):
     if isinstance(value, (int, float)):
         return value
@@ -526,7 +522,7 @@ def build_raw_vs_weighted_ratios(records, window="5h"):
 
     ratios = []
     for i in range(1, len(eligible)):
-        prev_ts, prev_util, prev_rec = eligible[i - 1]
+        _, prev_util, _ = eligible[i - 1]
         curr_ts, curr_util, curr_rec = eligible[i]
         if curr_util <= prev_util:
             continue
