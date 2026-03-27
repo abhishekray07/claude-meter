@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claude-meter dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1b26;
+    --surface: #24283b;
+    --border: #414868;
+    --text: #c0caf5;
+    --text-muted: #565f89;
+    --accent: #7aa2f7;
+    --accent2: #bb9af7;
+    --green: #9ece6a;
+    --yellow: #e0af68;
+    --red: #f7768e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 24px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .header .meta {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .header .meta span {
+    margin-right: 16px;
+  }
+  .header .meta strong {
+    color: var(--text);
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .card.full {
+    grid-column: 1 / -1;
+  }
+  .gauge-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .gauge {
+    flex: 1;
+    min-width: 180px;
+  }
+  .gauge-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .gauge-bar {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .gauge-bar .fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .gauge-bar .peak-marker {
+    position: absolute;
+    top: -2px;
+    width: 2px;
+    height: 12px;
+    background: var(--red);
+    border-radius: 1px;
+  }
+  .gauge-value {
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .gauge-peak {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  td.muted {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .total-row td {
+    font-weight: 700;
+    border-top: 2px solid var(--border);
+  }
+  .chart-container {
+    position: relative;
+    height: 300px;
+  }
+  .notice {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .color-green { color: var(--green); }
+  .color-yellow { color: var(--yellow); }
+  .color-red { color: var(--red); }
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+    .header { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>claude-meter</h1>
+  <div class="meta">
+    <span>Plan: <strong>max_20x</strong></span>
+    <span>Period: <strong>2026-03-25 to 2026-03-27</strong></span>
+    <span>API calls: <strong>5,041</strong></span>
+    <span>Updated: <strong>2026-03-27 03:05:33 UTC</strong></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Utilization Gauges -->
+  <div class="grid">
+    <div class="card">
+      <h2>Current Utilization</h2>
+      <div class="gauge-row">
+        <div class="gauge">
+          <div class="gauge-label">5-hour window</div>
+          <div class="gauge-bar">
+            <div class="fill" style="width: 9.0%; background: var(--green)"></div>
+            <div class="peak-marker" style="left: 88.0%"></div>
+          </div>
+          <div class="gauge-value color-green">9.0%</div>
+          <div class="gauge-peak">Peak: 88.0%</div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-label">7-day window</div>
+          <div class="gauge-bar">
+            <div class="fill" style="width: 82.0%; background: var(--red)"></div>
+            <div class="peak-marker" style="left: 82.0%"></div>
+          </div>
+          <div class="gauge-value color-red">82.0%</div>
+          <div class="gauge-peak">Peak: 82.0%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Usage -->
+    <div class="card">
+      <h2>Token Usage</h2>
+      <table>
+        <tr><th>Type</th><th>Tokens</th></tr>
+        <tr><td>Input</td><td>5,589,946</td></tr>
+        <tr><td>Output</td><td>1,967,476</td></tr>
+        <tr><td>Cache read</td><td>474,798,400 (95.2%)</td></tr>
+        <tr><td>Cache create</td><td>16,585,044</td></tr>
+        <tr class="total-row"><td>Total</td><td>498,940,866</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Budget Estimates -->
+  <div class="grid">
+    <div class="card full">
+      <h2>Budget Estimates (per window cycle)</h2>
+      <table>
+        <tr><th>Window</th><th>Range</th><th>Median</th><th>p25-p75</th><th>Sessions</th></tr>
+        <tr><td>5h</td><td>$35 - $401</td><td>$209</td><td>$109 - $300</td><td>12</td></tr>
+<tr><td>7d</td><td>$1,949</td><td>$1,949</td><td>-</td><td>1</td></tr>
+<tr><td>7d_sonnet</td><td colspan="4" class="muted">Not enough data</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Utilization Chart -->
+  <div class="grid">
+    <div class="card full">
+      <h2>Utilization Over Time</h2>
+      <div class="chart-container">
+        <canvas id="utilizationChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-Model Breakdown -->
+  <div class="grid">
+    <div class="card full">
+      <h2>Per-Model Breakdown</h2>
+      <table>
+        <tr><th>Model</th><th>Calls</th><th>Input Tokens</th><th>Output Tokens</th></tr>
+        <tr><td>claude-opus-4-6</td><td>2,695</td><td>3.9M</td><td>1.0M</td></tr>
+<tr><td>claude-sonnet-4-6</td><td>1,149</td><td>534.1K</td><td>584.0K</td></tr>
+<tr><td>claude-haiku-4-5-20251001</td><td>882</td><td>1.1M</td><td>368.6K</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="notice">
+    This dashboard contains real, non-anonymized usage data from a single user.
+  </div>
+</div>
+
+<script>
+const DATA = {"ts_5h": [{"timestamp": "2026-03-25T21:55:15.454001Z", "utilization": 0.09}, {"timestamp": "2026-03-25T22:02:25.882823Z", "utilization": 0.11}, {"timestamp": "2026-03-25T22:11:17.427437Z", "utilization": 0.12}, {"timestamp": "2026-03-25T22:11:26.739015Z", "utilization": 0.12}, {"timestamp": "2026-03-25T22:19:23.009142Z", "utilization": 0.13}, {"timestamp": "2026-03-25T22:20:10.782529Z", "utilization": 0.13}, {"timestamp": "2026-03-25T22:23:01.739893Z", "utilization": 0.13}, {"timestamp": "2026-03-25T22:26:23.475306Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:29:14.867719Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:47:27.584382Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:47:40.866665Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:47:47.584119Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:47:54.529931Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:48:01.175918Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:48:48.876128Z", "utilization": 0.14}, {"timestamp": "2026-03-25T22:49:59.894454Z", "utilization": 0.15}, {"timestamp": "2026-03-25T22:50:34.267287Z", "utilization": 0.15}, {"timestamp": "2026-03-25T22:52:26.157524Z", "utilization": 0.15}, {"timestamp": "2026-03-25T22:54:45.289947Z", "utilization": 0.15}, {"timestamp": "2026-03-25T23:01:30.114754Z", "utilization": 0.16}, {"timestamp": "2026-03-25T23:01:56.216018Z", "utilization": 0.16}, {"timestamp": "2026-03-25T23:45:10.866373Z", "utilization": 0.17}, {"timestamp": "2026-03-26T01:07:00.116364Z", "utilization": 0.18}, {"timestamp": "2026-03-26T01:35:24.786891Z", "utilization": 0.2}, {"timestamp": "2026-03-26T01:40:36.409696Z", "utilization": 0.21}, {"timestamp": "2026-03-26T01:42:39.797186Z", "utilization": 0.21}, {"timestamp": "2026-03-26T01:50:26.225697Z", "utilization": 0.21}, {"timestamp": "2026-03-26T01:59:19.507162Z", "utilization": 0.21}, {"timestamp": "2026-03-26T02:08:51.021836Z", "utilization": 0.01}, {"timestamp": "2026-03-26T02:49:49.864541Z", "utilization": 0.01}, {"timestamp": "2026-03-26T03:01:00.985394Z", "utilization": 0.01}, {"timestamp": "2026-03-26T03:14:07.57277Z", "utilization": 0.02}, {"timestamp": "2026-03-26T03:14:19.489323Z", "utilization": 0.02}, {"timestamp": "2026-03-26T03:17:10.225246Z", "utilization": 0.02}, {"timestamp": "2026-03-26T03:18:57.268558Z", "utilization": 0.02}, {"timestamp": "2026-03-26T03:37:12.357075Z", "utilization": 0.02}, {"timestamp": "2026-03-26T03:37:51.015756Z", "utilization": 0.03}, {"timestamp": "2026-03-26T03:40:38.369611Z", "utilization": 0.03}, {"timestamp": "2026-03-26T03:41:07.026971Z", "utilization": 0.03}, {"timestamp": "2026-03-26T03:44:43.436286Z", "utilization": 0.03}, {"timestamp": "2026-03-26T03:48:20.731245Z", "utilization": 0.04}, {"timestamp": "2026-03-26T03:49:25.473413Z", "utilization": 0.04}, {"timestamp": "2026-03-26T04:52:04.292433Z", "utilization": 0.05}, {"timestamp": "2026-03-26T04:53:13.024551Z", "utilization": 0.05}, {"timestamp": "2026-03-26T04:53:57.326063Z", "utilization": 0.05}, {"timestamp": "2026-03-26T04:57:01.765177Z", "utilization": 0.06}, {"timestamp": "2026-03-26T04:57:29.08668Z", "utilization": 0.06}, {"timestamp": "2026-03-26T04:58:13.613895Z", "utilization": 0.06}, {"timestamp": "2026-03-26T04:59:44.228666Z", "utilization": 0.06}, {"timestamp": "2026-03-26T05:01:16.168509Z", "utilization": 0.07}, {"timestamp": "2026-03-26T05:01:47.758215Z", "utilization": 0.07}, {"timestamp": "2026-03-26T05:03:26.219146Z", "utilization": 0.07}, {"timestamp": "2026-03-26T05:04:31.354275Z", "utilization": 0.07}, {"timestamp": "2026-03-26T05:07:04.664276Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:07:10.07628Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:07:53.11575Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:08:42.235811Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:09:40.043342Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:10:30.930618Z", "utilization": 0.08}, {"timestamp": "2026-03-26T05:11:22.613169Z", "utilization": 0.09}, {"timestamp": "2026-03-26T05:12:11.379131Z", "utilization": 0.09}, {"timestamp": "2026-03-26T05:12:53.49387Z", "utilization": 0.09}, {"timestamp": "2026-03-26T05:13:54.359261Z", "utilization": 0.09}, {"timestamp": "2026-03-26T05:15:21.051648Z", "utilization": 0.1}, {"timestamp": "2026-03-26T05:15:32.550309Z", "utilization": 0.1}, {"timestamp": "2026-03-26T05:16:22.674438Z", "utilization": 0.1}, {"timestamp": "2026-03-26T09:07:35.162319Z", "utilization": 0.03}, {"timestamp": "2026-03-26T09:08:01.413649Z", "utilization": 0.03}, {"timestamp": "2026-03-26T09:08:51.618425Z", "utilization": 0.03}, {"timestamp": "2026-03-26T09:09:42.318697Z", "utilization": 0.03}, {"timestamp": "2026-03-26T09:10:04.3856Z", "utilization": 0.03}, {"timestamp": "2026-03-26T09:13:45.980902Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:13:51.722059Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:15:01.327192Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:16:41.971589Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:17:48.182565Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:22:21.824221Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:22:46.030858Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:26:05.034214Z", "utilization": 0.04}, {"timestamp": "2026-03-26T09:29:41.21779Z", "utilization": 0.05}, {"timestamp": "2026-03-26T09:30:45.865948Z", "utilization": 0.05}, {"timestamp": "2026-03-26T09:34:58.747147Z", "utilization": 0.05}, {"timestamp": "2026-03-26T09:39:57.847661Z", "utilization": 0.05}, {"timestamp": "2026-03-26T09:40:56.910811Z", "utilization": 0.05}, {"timestamp": "2026-03-26T09:42:17.82831Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:43:06.344444Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:44:05.950263Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:45:14.371375Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:46:02.522348Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:47:01.766681Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:48:19.039588Z", "utilization": 0.06}, {"timestamp": "2026-03-26T09:49:18.544285Z", "utilization": 0.06}, {"timestamp": "2026-03-26T13:22:22.435149Z", "utilization": 0.05}, {"timestamp": "2026-03-26T13:22:33.092405Z", "utilization": 0.05}, {"timestamp": "2026-03-26T13:22:39.851711Z", "utilization": 0.05}, {"timestamp": "2026-03-26T13:22:50.002359Z", "utilization": 0.05}, {"timestamp": "2026-03-26T13:23:42.153312Z", "utilization": 0.06}, {"timestamp": "2026-03-26T13:23:53.100738Z", "utilization": 0.06}, {"timestamp": "2026-03-26T13:26:01.137574Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:29:16.082327Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:29:49.996192Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:30:00.254678Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:30:08.53745Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:30:17.776677Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:30:28.965175Z", "utilization": 0.08}, {"timestamp": "2026-03-26T13:31:15.479051Z", "utilization": 0.09}, {"timestamp": "2026-03-26T13:32:36.278802Z", "utilization": 0.1}, {"timestamp": "2026-03-26T14:25:01.660693Z", "utilization": 0.3}, {"timestamp": "2026-03-26T14:26:49.13475Z", "utilization": 0.31}, {"timestamp": "2026-03-26T14:28:45.736716Z", "utilization": 0.32}, {"timestamp": "2026-03-26T14:43:52.503154Z", "utilization": 0.34}, {"timestamp": "2026-03-26T14:46:35.385489Z", "utilization": 0.35}, {"timestamp": "2026-03-26T14:46:35.473612Z", "utilization": 0.35}, {"timestamp": "2026-03-26T14:46:47.234244Z", "utilization": 0.35}, {"timestamp": "2026-03-26T14:46:57.091734Z", "utilization": 0.35}, {"timestamp": "2026-03-26T14:47:14.943105Z", "utilization": 0.36}, {"timestamp": "2026-03-26T14:47:49.642729Z", "utilization": 0.36}, {"timestamp": "2026-03-26T14:48:45.774931Z", "utilization": 0.37}, {"timestamp": "2026-03-26T14:50:34.73785Z", "utilization": 0.39}, {"timestamp": "2026-03-26T14:51:16.899526Z", "utilization": 0.4}, {"timestamp": "2026-03-26T14:52:39.520056Z", "utilization": 0.41}, {"timestamp": "2026-03-26T14:58:10.387731Z", "utilization": 0.42}, {"timestamp": "2026-03-26T14:59:40.272992Z", "utilization": 0.43}, {"timestamp": "2026-03-26T14:59:51.765465Z", "utilization": 0.43}, {"timestamp": "2026-03-26T15:03:29.2417Z", "utilization": 0.45}, {"timestamp": "2026-03-26T15:03:37.48349Z", "utilization": 0.45}, {"timestamp": "2026-03-26T15:04:43.04888Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:04:48.454184Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:04:55.140875Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:05:01.404884Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:05:08.511785Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:05:14.208319Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:05:28.376717Z", "utilization": 0.46}, {"timestamp": "2026-03-26T15:05:55.317564Z", "utilization": 0.47}, {"timestamp": "2026-03-26T15:05:58.708094Z", "utilization": 0.47}, {"timestamp": "2026-03-26T15:07:02.528927Z", "utilization": 0.48}, {"timestamp": "2026-03-26T15:07:23.530777Z", "utilization": 0.49}, {"timestamp": "2026-03-26T15:09:02.766647Z", "utilization": 0.5}, {"timestamp": "2026-03-26T15:09:13.69182Z", "utilization": 0.5}, {"timestamp": "2026-03-26T15:09:22.063239Z", "utilization": 0.5}, {"timestamp": "2026-03-26T15:09:30.149991Z", "utilization": 0.5}, {"timestamp": "2026-03-26T15:09:44.519544Z", "utilization": 0.5}, {"timestamp": "2026-03-26T15:23:32.333108Z", "utilization": 0.52}, {"timestamp": "2026-03-26T15:23:36.729485Z", "utilization": 0.53}, {"timestamp": "2026-03-26T15:29:54.621958Z", "utilization": 0.53}, {"timestamp": "2026-03-26T15:30:02.346511Z", "utilization": 0.53}, {"timestamp": "2026-03-26T15:30:19.815993Z", "utilization": 0.54}, {"timestamp": "2026-03-26T15:30:22.032893Z", "utilization": 0.54}, {"timestamp": "2026-03-26T15:30:40.112967Z", "utilization": 0.54}, {"timestamp": "2026-03-26T15:32:09.28389Z", "utilization": 0.55}, {"timestamp": "2026-03-26T15:32:43.779102Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:33:28.58845Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:33:51.213853Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:34:01.102909Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:34:06.655612Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:34:14.652953Z", "utilization": 0.56}, {"timestamp": "2026-03-26T15:34:55.328559Z", "utilization": 0.57}, {"timestamp": "2026-03-26T15:36:16.890559Z", "utilization": 0.58}, {"timestamp": "2026-03-26T15:36:39.316324Z", "utilization": 0.58}, {"timestamp": "2026-03-26T15:37:26.15327Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:37:31.860961Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:37:38.785765Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:37:44.884317Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:37:50.667588Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:38:02.96863Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:38:21.943723Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:38:36.651369Z", "utilization": 0.59}, {"timestamp": "2026-03-26T15:39:16.619559Z", "utilization": 0.6}, {"timestamp": "2026-03-26T15:39:23.830788Z", "utilization": 0.6}, {"timestamp": "2026-03-26T15:39:51.568014Z", "utilization": 0.61}, {"timestamp": "2026-03-26T15:40:44.771565Z", "utilization": 0.61}, {"timestamp": "2026-03-26T15:43:05.277507Z", "utilization": 0.62}, {"timestamp": "2026-03-26T15:43:46.534885Z", "utilization": 0.63}, {"timestamp": "2026-03-26T15:43:54.374614Z", "utilization": 0.63}, {"timestamp": "2026-03-26T15:46:49.663335Z", "utilization": 0.64}, {"timestamp": "2026-03-26T15:49:03.910052Z", "utilization": 0.65}, {"timestamp": "2026-03-26T15:49:10.304947Z", "utilization": 0.65}, {"timestamp": "2026-03-26T15:54:17.488262Z", "utilization": 0.66}, {"timestamp": "2026-03-26T15:54:52.773784Z", "utilization": 0.66}, {"timestamp": "2026-03-26T15:55:14.013229Z", "utilization": 0.66}, {"timestamp": "2026-03-26T15:59:24.744547Z", "utilization": 0.67}, {"timestamp": "2026-03-26T16:16:19.626641Z", "utilization": 0.68}, {"timestamp": "2026-03-26T16:16:24.499296Z", "utilization": 0.68}, {"timestamp": "2026-03-26T16:24:23.45176Z", "utilization": 0.69}, {"timestamp": "2026-03-26T16:24:26.147784Z", "utilization": 0.69}, {"timestamp": "2026-03-26T16:24:34.131866Z", "utilization": 0.69}, {"timestamp": "2026-03-26T16:24:43.846388Z", "utilization": 0.69}, {"timestamp": "2026-03-26T16:24:58.099453Z", "utilization": 0.7}, {"timestamp": "2026-03-26T16:24:59.894079Z", "utilization": 0.7}, {"timestamp": "2026-03-26T16:25:12.536425Z", "utilization": 0.7}, {"timestamp": "2026-03-26T16:25:49.396218Z", "utilization": 0.71}, {"timestamp": "2026-03-26T16:25:56.251602Z", "utilization": 0.71}, {"timestamp": "2026-03-26T16:26:34.866363Z", "utilization": 0.71}, {"timestamp": "2026-03-26T16:26:53.797163Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:27:20.140284Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:28:08.928503Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:30:18.40659Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:30:44.069758Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:31:39.075002Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:33:21.069761Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:33:23.754263Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:33:44.68335Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:34:15.098175Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:34:46.694999Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:35:16.715566Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:35:52.141459Z", "utilization": 0.75}, {"timestamp": "2026-03-26T16:36:38.227732Z", "utilization": 0.76}, {"timestamp": "2026-03-26T16:37:13.277298Z", "utilization": 0.76}, {"timestamp": "2026-03-26T16:49:45.068897Z", "utilization": 0.77}, {"timestamp": "2026-03-26T16:49:51.190758Z", "utilization": 0.77}, {"timestamp": "2026-03-26T16:50:04.156711Z", "utilization": 0.77}, {"timestamp": "2026-03-26T16:50:27.39125Z", "utilization": 0.77}, {"timestamp": "2026-03-26T16:50:54.418666Z", "utilization": 0.84}, {"timestamp": "2026-03-26T16:51:03.345691Z", "utilization": 0.84}, {"timestamp": "2026-03-26T16:51:35.473777Z", "utilization": 0.85}, {"timestamp": "2026-03-26T16:51:39.475416Z", "utilization": 0.85}, {"timestamp": "2026-03-26T16:51:54.968382Z", "utilization": 0.85}, {"timestamp": "2026-03-26T16:52:18.870568Z", "utilization": 0.85}, {"timestamp": "2026-03-26T16:52:38.353232Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:52:51.63649Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:53:19.191047Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:53:49.302745Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:54:19.250974Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:54:47.537289Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:55:20.735152Z", "utilization": 0.86}, {"timestamp": "2026-03-26T16:56:28.27982Z", "utilization": 0.87}, {"timestamp": "2026-03-26T16:57:52.603857Z", "utilization": 0.88}, {"timestamp": "2026-03-26T16:57:55.058781Z", "utilization": 0.88}, {"timestamp": "2026-03-26T16:59:12.866184Z", "utilization": 0.88}, {"timestamp": "2026-03-26T16:59:43.885913Z", "utilization": 0.88}, {"timestamp": "2026-03-26T17:00:20.04487Z", "utilization": 0.88}, {"timestamp": "2026-03-26T17:01:16.054116Z", "utilization": 0.01}, {"timestamp": "2026-03-26T17:01:47.029528Z", "utilization": 0.02}, {"timestamp": "2026-03-26T17:02:12.166293Z", "utilization": 0.02}, {"timestamp": "2026-03-26T17:02:28.304351Z", "utilization": 0.02}, {"timestamp": "2026-03-26T17:02:45.648065Z", "utilization": 0.03}, {"timestamp": "2026-03-26T17:03:04.040604Z", "utilization": 0.03}, {"timestamp": "2026-03-26T17:03:35.282251Z", "utilization": 0.04}, {"timestamp": "2026-03-26T17:03:40.610307Z", "utilization": 0.04}, {"timestamp": "2026-03-26T17:03:56.06068Z", "utilization": 0.04}, {"timestamp": "2026-03-26T17:04:10.249282Z", "utilization": 0.04}, {"timestamp": "2026-03-26T17:04:36.284032Z", "utilization": 0.05}, {"timestamp": "2026-03-26T17:06:12.773722Z", "utilization": 0.06}, {"timestamp": "2026-03-26T17:06:16.148432Z", "utilization": 0.06}, {"timestamp": "2026-03-26T17:06:49.629261Z", "utilization": 0.06}, {"timestamp": "2026-03-26T17:07:15.682089Z", "utilization": 0.07}, {"timestamp": "2026-03-26T17:08:04.502959Z", "utilization": 0.08}, {"timestamp": "2026-03-26T17:08:11.25769Z", "utilization": 0.08}, {"timestamp": "2026-03-26T17:08:40.930459Z", "utilization": 0.08}, {"timestamp": "2026-03-26T17:09:09.554247Z", "utilization": 0.09}, {"timestamp": "2026-03-26T17:09:30.593124Z", "utilization": 0.09}, {"timestamp": "2026-03-26T17:10:00.100019Z", "utilization": 0.09}, {"timestamp": "2026-03-26T17:10:31.837394Z", "utilization": 0.1}, {"timestamp": "2026-03-26T17:10:49.336039Z", "utilization": 0.1}, {"timestamp": "2026-03-26T17:11:06.793695Z", "utilization": 0.1}, {"timestamp": "2026-03-26T17:12:09.757586Z", "utilization": 0.11}, {"timestamp": "2026-03-26T17:13:59.847662Z", "utilization": 0.12}, {"timestamp": "2026-03-26T17:14:27.006771Z", "utilization": 0.12}, {"timestamp": "2026-03-26T17:15:58.622856Z", "utilization": 0.13}, {"timestamp": "2026-03-26T17:16:43.12017Z", "utilization": 0.13}, {"timestamp": "2026-03-26T17:17:07.934605Z", "utilization": 0.13}, {"timestamp": "2026-03-26T17:17:37.222835Z", "utilization": 0.13}, {"timestamp": "2026-03-26T17:18:23.901961Z", "utilization": 0.14}, {"timestamp": "2026-03-26T17:18:41.05226Z", "utilization": 0.14}, {"timestamp": "2026-03-26T17:19:11.438505Z", "utilization": 0.14}, {"timestamp": "2026-03-26T17:19:51.853632Z", "utilization": 0.15}, {"timestamp": "2026-03-26T17:19:52.077871Z", "utilization": 0.15}, {"timestamp": "2026-03-26T17:20:20.25042Z", "utilization": 0.15}, {"timestamp": "2026-03-26T17:21:03.435034Z", "utilization": 0.16}, {"timestamp": "2026-03-26T17:22:01.513255Z", "utilization": 0.17}, {"timestamp": "2026-03-26T17:22:40.883309Z", "utilization": 0.17}, {"timestamp": "2026-03-26T17:23:15.583223Z", "utilization": 0.18}, {"timestamp": "2026-03-26T17:23:44.346155Z", "utilization": 0.18}, {"timestamp": "2026-03-26T17:24:25.11876Z", "utilization": 0.18}, {"timestamp": "2026-03-26T17:25:20.22808Z", "utilization": 0.18}, {"timestamp": "2026-03-26T17:25:43.711352Z", "utilization": 0.19}, {"timestamp": "2026-03-26T17:26:15.530352Z", "utilization": 0.19}, {"timestamp": "2026-03-26T17:26:44.317267Z", "utilization": 0.19}, {"timestamp": "2026-03-26T17:27:59.251975Z", "utilization": 0.2}, {"timestamp": "2026-03-26T17:28:05.090658Z", "utilization": 0.2}, {"timestamp": "2026-03-26T17:30:05.079913Z", "utilization": 0.21}, {"timestamp": "2026-03-26T17:30:16.655256Z", "utilization": 0.21}, {"timestamp": "2026-03-26T17:31:21.703986Z", "utilization": 0.22}, {"timestamp": "2026-03-26T17:31:43.570458Z", "utilization": 0.22}, {"timestamp": "2026-03-26T17:32:17.801764Z", "utilization": 0.22}, {"timestamp": "2026-03-26T17:32:59.819176Z", "utilization": 0.23}, {"timestamp": "2026-03-26T17:33:39.378357Z", "utilization": 0.23}, {"timestamp": "2026-03-26T17:33:57.549859Z", "utilization": 0.23}, {"timestamp": "2026-03-26T17:34:36.183483Z", "utilization": 0.24}, {"timestamp": "2026-03-26T17:35:00.148828Z", "utilization": 0.24}, {"timestamp": "2026-03-26T17:35:25.42976Z", "utilization": 0.24}, {"timestamp": "2026-03-26T17:35:49.256498Z", "utilization": 0.24}, {"timestamp": "2026-03-26T17:36:18.479329Z", "utilization": 0.24}, {"timestamp": "2026-03-26T17:36:48.958639Z", "utilization": 0.25}, {"timestamp": "2026-03-26T17:38:09.002008Z", "utilization": 0.26}, {"timestamp": "2026-03-26T17:38:14.922631Z", "utilization": 0.26}, {"timestamp": "2026-03-26T17:39:35.836027Z", "utilization": 0.27}, {"timestamp": "2026-03-26T17:40:10.065253Z", "utilization": 0.27}, {"timestamp": "2026-03-26T17:41:17.96147Z", "utilization": 0.28}, {"timestamp": "2026-03-26T17:41:26.960819Z", "utilization": 0.28}, {"timestamp": "2026-03-26T17:42:07.315215Z", "utilization": 0.28}, {"timestamp": "2026-03-26T17:43:06.481463Z", "utilization": 0.28}, {"timestamp": "2026-03-26T17:43:44.581107Z", "utilization": 0.28}, {"timestamp": "2026-03-26T17:44:58.11322Z", "utilization": 0.29}, {"timestamp": "2026-03-26T17:45:12.039136Z", "utilization": 0.29}, {"timestamp": "2026-03-26T17:46:03.466444Z", "utilization": 0.29}, {"timestamp": "2026-03-26T17:47:13.777712Z", "utilization": 0.29}, {"timestamp": "2026-03-26T17:47:49.033527Z", "utilization": 0.29}, {"timestamp": "2026-03-26T17:48:54.840302Z", "utilization": 0.3}, {"timestamp": "2026-03-26T17:50:25.440902Z", "utilization": 0.31}, {"timestamp": "2026-03-26T17:50:36.752576Z", "utilization": 0.31}, {"timestamp": "2026-03-26T17:51:16.073481Z", "utilization": 0.31}, {"timestamp": "2026-03-26T17:52:34.219708Z", "utilization": 0.31}, {"timestamp": "2026-03-26T17:53:11.68511Z", "utilization": 0.32}, {"timestamp": "2026-03-26T17:53:37.391214Z", "utilization": 0.32}, {"timestamp": "2026-03-26T17:54:12.979469Z", "utilization": 0.32}, {"timestamp": "2026-03-26T17:56:17.419212Z", "utilization": 0.33}, {"timestamp": "2026-03-26T17:57:25.782846Z", "utilization": 0.33}, {"timestamp": "2026-03-26T17:58:52.333854Z", "utilization": 0.33}, {"timestamp": "2026-03-26T17:59:33.477958Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:00:56.714519Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:01:58.09455Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:03:10.735401Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:04:00.261404Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:04:25.228353Z", "utilization": 0.34}, {"timestamp": "2026-03-26T18:05:16.667419Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:06:48.814955Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:08:14.78743Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:10:06.12493Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:11:10.393144Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:12:02.881569Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:12:48.240364Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:13:32.212327Z", "utilization": 0.35}, {"timestamp": "2026-03-26T18:16:33.776795Z", "utilization": 0.36}, {"timestamp": "2026-03-26T18:16:48.725017Z", "utilization": 0.36}, {"timestamp": "2026-03-26T18:17:54.236893Z", "utilization": 0.36}, {"timestamp": "2026-03-26T18:19:24.108373Z", "utilization": 0.36}, {"timestamp": "2026-03-26T18:20:49.072925Z", "utilization": 0.36}, {"timestamp": "2026-03-26T18:22:00.160853Z", "utilization": 0.37}, {"timestamp": "2026-03-26T18:22:07.810885Z", "utilization": 0.37}, {"timestamp": "2026-03-26T18:22:50.181581Z", "utilization": 0.37}, {"timestamp": "2026-03-26T18:23:35.218793Z", "utilization": 0.37}, {"timestamp": "2026-03-26T18:24:19.258295Z", "utilization": 0.37}, {"timestamp": "2026-03-26T18:25:52.026372Z", "utilization": 0.38}, {"timestamp": "2026-03-26T18:26:09.677479Z", "utilization": 0.38}, {"timestamp": "2026-03-26T18:26:51.652449Z", "utilization": 0.38}, {"timestamp": "2026-03-26T18:28:18.9233Z", "utilization": 0.4}, {"timestamp": "2026-03-26T18:28:49.339739Z", "utilization": 0.4}, {"timestamp": "2026-03-26T18:29:21.055861Z", "utilization": 0.4}, {"timestamp": "2026-03-26T18:30:13.028011Z", "utilization": 0.4}, {"timestamp": "2026-03-26T18:31:19.16937Z", "utilization": 0.4}, {"timestamp": "2026-03-26T18:32:42.830972Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:32:49.754475Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:33:32.948498Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:34:25.584079Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:39:29.406251Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:39:56.321881Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:40:56.391881Z", "utilization": 0.41}, {"timestamp": "2026-03-26T18:45:26.849329Z", "utilization": 0.42}, {"timestamp": "2026-03-26T18:46:25.119447Z", "utilization": 0.42}, {"timestamp": "2026-03-26T18:47:40.418269Z", "utilization": 0.42}, {"timestamp": "2026-03-26T18:48:40.346467Z", "utilization": 0.42}, {"timestamp": "2026-03-26T18:49:41.290296Z", "utilization": 0.42}, {"timestamp": "2026-03-26T18:52:10.188751Z", "utilization": 0.42}, {"timestamp": "2026-03-26T19:02:32.494624Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:02:39.494674Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:02:49.468531Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:03:08.548555Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:03:34.797743Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:04:20.802704Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:04:37.436714Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:06:00.319118Z", "utilization": 0.43}, {"timestamp": "2026-03-26T19:06:14.868669Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:06:28.173129Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:06:44.784657Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:07:08.534396Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:07:49.003535Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:08:54.894721Z", "utilization": 0.44}, {"timestamp": "2026-03-26T19:10:28.699219Z", "utilization": 0.45}, {"timestamp": "2026-03-26T19:12:59.653929Z", "utilization": 0.45}, {"timestamp": "2026-03-26T19:13:47.11895Z", "utilization": 0.45}, {"timestamp": "2026-03-26T19:14:11.413291Z", "utilization": 0.45}, {"timestamp": "2026-03-26T19:14:55.014679Z", "utilization": 0.46}, {"timestamp": "2026-03-26T19:15:04.495809Z", "utilization": 0.46}, {"timestamp": "2026-03-26T19:15:46.186985Z", "utilization": 0.46}, {"timestamp": "2026-03-26T19:16:18.815426Z", "utilization": 0.46}, {"timestamp": "2026-03-26T19:17:03.168257Z", "utilization": 0.46}, {"timestamp": "2026-03-26T19:18:33.502554Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:18:51.02238Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:19:32.295108Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:20:03.680506Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:20:50.517045Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:21:17.514674Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:21:55.492849Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:22:39.192873Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:23:08.086498Z", "utilization": 0.47}, {"timestamp": "2026-03-26T19:24:02.97148Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:24:52.523233Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:25:34.654337Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:26:07.595556Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:26:30.822612Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:27:01.947804Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:27:38.894366Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:28:50.689423Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:29:13.477494Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:29:51.197188Z", "utilization": 0.48}, {"timestamp": "2026-03-26T19:30:03.76125Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:30:33.083236Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:30:59.130431Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:31:16.857425Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:31:42.208598Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:32:06.996354Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:32:23.320368Z", "utilization": 0.49}, {"timestamp": "2026-03-26T19:32:35.936943Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:32:48.085616Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:32:53.789554Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:33:04.499234Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:33:20.961209Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:33:36.216181Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:34:06.052145Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:34:24.682226Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:34:41.324465Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:34:53.313828Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:35:06.040033Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:35:29.734841Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:35:49.63301Z", "utilization": 0.5}, {"timestamp": "2026-03-26T19:36:23.651671Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:36:27.022263Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:36:39.593023Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:36:56.411838Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:37:15.591817Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:37:33.64188Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:37:53.878621Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:38:10.921021Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:38:32.548831Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:38:55.253281Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:39:12.746278Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:39:26.973599Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:39:38.906021Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:39:50.026129Z", "utilization": 0.51}, {"timestamp": "2026-03-26T19:40:49.522784Z", "utilization": 0.52}, {"timestamp": "2026-03-26T19:40:55.27853Z", "utilization": 0.52}, {"timestamp": "2026-03-26T19:41:13.343169Z", "utilization": 0.52}, {"timestamp": "2026-03-26T19:41:49.992144Z", "utilization": 0.52}, {"timestamp": "2026-03-26T19:43:10.932531Z", "utilization": 0.52}, {"timestamp": "2026-03-26T19:43:27.340578Z", "utilization": 0.53}, {"timestamp": "2026-03-26T19:59:28.401698Z", "utilization": 0.53}, {"timestamp": "2026-03-26T20:00:25.729085Z", "utilization": 0.53}, {"timestamp": "2026-03-26T21:09:00.065913Z", "utilization": 0.54}, {"timestamp": "2026-03-26T21:39:32.378994Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:40:36.074428Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:41:28.894381Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:41:39.723624Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:41:50.510499Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:44:57.713582Z", "utilization": 0.57}, {"timestamp": "2026-03-26T21:53:37.37428Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:53:55.617365Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:54:21.842358Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:54:39.899108Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:55:09.92226Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:55:39.631634Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:55:49.712711Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:56:03.110849Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:56:24.859662Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:56:39.985815Z", "utilization": 0.58}, {"timestamp": "2026-03-26T21:58:03.74888Z", "utilization": 0.58}, {"timestamp": "2026-03-26T22:14:46.555543Z", "utilization": 0.02}, {"timestamp": "2026-03-26T22:15:09.685333Z", "utilization": 0.02}, {"timestamp": "2026-03-26T22:18:07.155869Z", "utilization": 0.02}, {"timestamp": "2026-03-26T22:22:34.701123Z", "utilization": 0.02}, {"timestamp": "2026-03-26T22:48:57.983742Z", "utilization": 0.02}, {"timestamp": "2026-03-26T22:53:18.603221Z", "utilization": 0.03}, {"timestamp": "2026-03-26T22:53:29.067542Z", "utilization": 0.03}, {"timestamp": "2026-03-26T23:00:34.400512Z", "utilization": 0.03}, {"timestamp": "2026-03-26T23:08:52.667223Z", "utilization": 0.03}, {"timestamp": "2026-03-26T23:13:51.82267Z", "utilization": 0.03}, {"timestamp": "2026-03-26T23:20:50.870005Z", "utilization": 0.04}, {"timestamp": "2026-03-26T23:22:04.49433Z", "utilization": 0.04}, {"timestamp": "2026-03-26T23:24:45.095554Z", "utilization": 0.05}, {"timestamp": "2026-03-26T23:26:48.111691Z", "utilization": 0.05}, {"timestamp": "2026-03-26T23:31:00.011484Z", "utilization": 0.05}, {"timestamp": "2026-03-26T23:33:51.234768Z", "utilization": 0.05}, {"timestamp": "2026-03-27T01:25:38.585648Z", "utilization": 0.06}, {"timestamp": "2026-03-27T01:26:06.606983Z", "utilization": 0.06}, {"timestamp": "2026-03-27T01:30:27.874017Z", "utilization": 0.07}, {"timestamp": "2026-03-27T01:31:10.613954Z", "utilization": 0.07}, {"timestamp": "2026-03-27T01:55:36.737421Z", "utilization": 0.07}, {"timestamp": "2026-03-27T01:56:59.614725Z", "utilization": 0.07}, {"timestamp": "2026-03-27T01:57:38.293095Z", "utilization": 0.07}, {"timestamp": "2026-03-27T01:58:26.542774Z", "utilization": 0.08}, {"timestamp": "2026-03-27T01:59:06.902013Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:00:43.583172Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:01:43.4033Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:02:11.392458Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:02:48.353911Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:03:55.597616Z", "utilization": 0.08}, {"timestamp": "2026-03-27T02:04:46.331031Z", "utilization": 0.09}, {"timestamp": "2026-03-27T02:05:25.481373Z", "utilization": 0.09}, {"timestamp": "2026-03-27T02:06:20.477796Z", "utilization": 0.09}, {"timestamp": "2026-03-27T02:36:57.304287Z", "utilization": 0.09}], "ts_7d": [{"timestamp": "2026-03-25T21:55:15.454001Z", "utilization": 0.61}, {"timestamp": "2026-03-25T21:56:59.599219Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:03:59.389843Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:11:26.739015Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:16:07.500168Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:20:29.958447Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:23:10.114448Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:26:23.475306Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:29:24.204735Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:47:31.596607Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:47:42.484201Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:47:48.996801Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:47:54.80649Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:48:03.461412Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:48:59.004514Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:49:28.440154Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:50:34.267287Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:52:50.838769Z", "utilization": 0.61}, {"timestamp": "2026-03-25T22:56:41.891611Z", "utilization": 0.61}, {"timestamp": "2026-03-25T23:00:57.309094Z", "utilization": 0.62}, {"timestamp": "2026-03-25T23:02:00.334142Z", "utilization": 0.62}, {"timestamp": "2026-03-25T23:11:38.86747Z", "utilization": 0.62}, {"timestamp": "2026-03-25T23:47:37.051898Z", "utilization": 0.62}, {"timestamp": "2026-03-26T01:14:42.965023Z", "utilization": 0.62}, {"timestamp": "2026-03-26T01:39:45.227043Z", "utilization": 0.62}, {"timestamp": "2026-03-26T01:43:04.197054Z", "utilization": 0.62}, {"timestamp": "2026-03-26T01:53:53.856108Z", "utilization": 0.62}, {"timestamp": "2026-03-26T01:59:37.591879Z", "utilization": 0.62}, {"timestamp": "2026-03-26T02:05:05.227766Z", "utilization": 0.62}, {"timestamp": "2026-03-26T02:06:08.725836Z", "utilization": 0.62}, {"timestamp": "2026-03-26T02:08:56.869776Z", "utilization": 0.62}, {"timestamp": "2026-03-26T02:56:14.075254Z", "utilization": 0.62}, {"timestamp": "2026-03-26T03:11:01.867102Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:13:42.749104Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:14:43.968387Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:17:29.94628Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:19:10.352544Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:37:24.388818Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:37:58.876731Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:40:52.106399Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:42:02.906295Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:45:02.733423Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:49:03.864841Z", "utilization": 0.63}, {"timestamp": "2026-03-26T03:49:48.131431Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:52:48.623418Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:53:44.07553Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:54:32.417699Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:57:01.765177Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:57:42.803493Z", "utilization": 0.63}, {"timestamp": "2026-03-26T04:59:18.993181Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:00:18.999131Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:01:16.168509Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:02:07.980801Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:04:02.312307Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:05:24.52379Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:06:20.305617Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:07:35.192723Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:08:29.254844Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:09:12.759818Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:10:16.56569Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:11:08.807947Z", "utilization": 0.63}, {"timestamp": "2026-03-26T05:12:10.132325Z", "utilization": 0.64}, {"timestamp": "2026-03-26T05:12:43.914921Z", "utilization": 0.64}, {"timestamp": "2026-03-26T05:13:38.163461Z", "utilization": 0.64}, {"timestamp": "2026-03-26T05:14:29.714832Z", "utilization": 0.64}, {"timestamp": "2026-03-26T05:15:21.051648Z", "utilization": 0.64}, {"timestamp": "2026-03-26T08:54:09.893505Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:07:32.17125Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:07:56.881594Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:08:40.657211Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:09:35.16808Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:09:56.280491Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:10:45.523589Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:11:34.851535Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:14:59.650171Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:16:32.402226Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:17:41.932512Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:22:19.625951Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:22:44.118993Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:25:58.240593Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:29:21.105168Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:30:45.865948Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:34:58.747147Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:39:57.847661Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:40:56.910811Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:41:51.408818Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:43:06.344444Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:44:14.117308Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:45:18.520951Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:46:04.711098Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:47:19.295151Z", "utilization": 0.66}, {"timestamp": "2026-03-26T09:48:25.705036Z", "utilization": 0.66}, {"timestamp": "2026-03-26T13:22:20.230213Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:22:22.435149Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:22:33.555422Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:22:40.825601Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:22:51.291969Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:23:08.539084Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:23:50.216784Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:24:58.103654Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:29:19.609345Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:29:51.523462Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:30:00.712686Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:30:09.110684Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:30:18.744162Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:30:39.429889Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:31:11.24371Z", "utilization": 0.67}, {"timestamp": "2026-03-26T13:31:59.964157Z", "utilization": 0.67}, {"timestamp": "2026-03-26T14:22:49.129778Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:25:47.067959Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:27:35.228321Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:43:27.683673Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:46:14.955767Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:46:40.803614Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:46:52.147954Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:47:03.709951Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:47:23.771319Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:47:57.849764Z", "utilization": 0.69}, {"timestamp": "2026-03-26T14:48:57.301477Z", "utilization": 0.7}, {"timestamp": "2026-03-26T14:49:02.900653Z", "utilization": 0.7}, {"timestamp": "2026-03-26T14:51:26.43994Z", "utilization": 0.7}, {"timestamp": "2026-03-26T14:52:39.520056Z", "utilization": 0.7}, {"timestamp": "2026-03-26T14:58:24.097502Z", "utilization": 0.7}, {"timestamp": "2026-03-26T14:59:00.219493Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:00:10.134915Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:02:39.173321Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:04:22.832677Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:04:43.04888Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:04:51.900097Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:04:57.902665Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:05:05.798684Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:05:11.218926Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:05:19.955665Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:05:44.202336Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:05:54.768356Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:06:07.286305Z", "utilization": 0.7}, {"timestamp": "2026-03-26T15:07:02.528927Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:08:12.361534Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:09:08.909842Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:09:19.099913Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:09:27.532399Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:09:38.638982Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:11:46.438572Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:23:32.329506Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:29:52.973865Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:30:01.091858Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:30:09.987822Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:30:19.388407Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:30:37.926849Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:31:18.719726Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:32:22.229698Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:33:23.07133Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:33:50.956904Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:33:59.551393Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:34:05.653606Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:34:12.57503Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:34:32.97984Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:35:20.158705Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:36:33.587838Z", "utilization": 0.71}, {"timestamp": "2026-03-26T15:37:23.683535Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:37:31.860961Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:37:38.785765Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:37:44.884317Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:37:50.667588Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:38:02.96863Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:38:21.943723Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:38:45.539765Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:39:06.332256Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:39:27.008249Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:39:56.478572Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:40:50.293285Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:42:49.122212Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:43:31.944737Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:44:01.384104Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:46:00.327506Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:47:37.164851Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:49:31.680576Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:54:26.47388Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:54:55.720418Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:55:20.689004Z", "utilization": 0.72}, {"timestamp": "2026-03-26T15:57:40.565248Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:13:34.174128Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:17:50.973065Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:23:22.78607Z", "utilization": 0.72}, {"timestamp": "2026-03-26T16:24:34.131866Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:24:36.537113Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:24:46.453058Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:24:53.288991Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:25:02.897163Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:25:18.341376Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:25:44.411244Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:26:21.010945Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:26:40.292697Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:27:05.308217Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:27:29.190085Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:29:09.169297Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:30:22.919619Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:31:09.590591Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:32:16.143402Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:33:14.106379Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:33:31.865672Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:33:58.797065Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:34:34.899465Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:35:05.199005Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:35:37.16956Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:36:17.736257Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:36:53.303568Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:38:41.726316Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:49:46.404109Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:50:00.816789Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:50:21.522411Z", "utilization": 0.73}, {"timestamp": "2026-03-26T16:50:54.418666Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:51:00.697571Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:51:16.351685Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:51:35.473777Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:51:49.587536Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:52:14.538188Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:52:32.620608Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:52:47.634611Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:53:06.443989Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:53:46.5983Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:54:17.01922Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:54:41.619262Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:55:18.51484Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:55:52.410795Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:56:38.344392Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:57:52.603857Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:59:06.605253Z", "utilization": 0.74}, {"timestamp": "2026-03-26T16:59:43.885913Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:00:07.095806Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:00:40.072569Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:01:24.410633Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:01:47.029528Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:02:15.552334Z", "utilization": 0.74}, {"timestamp": "2026-03-26T17:02:45.648065Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:02:50.261744Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:03:10.515398Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:03:24.648519Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:03:45.078762Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:03:57.739735Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:04:16.196949Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:04:44.613014Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:05:19.085801Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:06:31.443292Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:06:57.012814Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:07:25.805468Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:07:57.902461Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:08:21.142082Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:08:48.991545Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:09:17.943635Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:09:41.686001Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:10:13.483561Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:10:37.587279Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:10:55.740413Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:11:29.153535Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:12:49.149266Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:13:34.060514Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:15:13.301323Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:16:20.751672Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:17:03.172321Z", "utilization": 0.75}, {"timestamp": "2026-03-26T17:17:42.188648Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:18:05.229152Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:18:34.845598Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:19:02.344226Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:19:26.762395Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:19:45.787878Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:20:04.070453Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:20:50.8959Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:21:50.535083Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:22:21.897153Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:23:03.93081Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:23:32.259631Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:24:16.77579Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:25:16.025583Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:25:34.280845Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:26:01.432295Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:26:35.597308Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:27:06.921972Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:28:02.766565Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:29:27.114603Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:30:15.54632Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:30:56.852143Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:31:38.27757Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:32:14.476883Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:32:51.786997Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:33:39.378357Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:33:57.549859Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:34:29.420611Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:35:00.148828Z", "utilization": 0.76}, {"timestamp": "2026-03-26T17:35:30.645117Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:35:52.796747Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:36:21.229006Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:36:42.736276Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:37:34.996423Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:38:14.922631Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:39:00.245545Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:40:17.306668Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:40:55.606133Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:41:30.84001Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:42:13.782843Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:43:06.875084Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:43:47.740895Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:44:33.447116Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:45:22.368261Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:46:26.217796Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:47:18.278978Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:47:55.237881Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:48:41.504486Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:50:02.577626Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:50:54.561299Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:51:29.983778Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:52:43.275462Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:53:20.95375Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:53:50.799107Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:54:37.59182Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:56:14.254394Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:58:08.124391Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:59:02.650662Z", "utilization": 0.77}, {"timestamp": "2026-03-26T17:59:51.191127Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:01:27.647057Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:02:38.956434Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:03:30.438126Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:04:17.330979Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:04:29.8459Z", "utilization": 0.77}, {"timestamp": "2026-03-26T18:06:48.814955Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:07:49.904589Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:09:34.149089Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:10:27.91452Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:11:51.065236Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:12:33.570621Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:13:15.302536Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:13:53.523524Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:14:46.126677Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:17:21.559052Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:18:38.752157Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:20:25.247364Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:21:26.324486Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:21:56.121715Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:22:41.946414Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:23:30.149923Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:24:14.146277Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:24:58.46451Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:26:00.114413Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:26:41.111348Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:27:59.727392Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:28:46.00483Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:29:17.695636Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:30:00.060114Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:31:10.649262Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:31:53.445429Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:32:42.830972Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:33:26.713969Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:34:18.022726Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:39:23.721968Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:39:51.095217Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:40:51.016603Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:44:11.157646Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:46:25.119447Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:47:40.418269Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:48:40.346467Z", "utilization": 0.78}, {"timestamp": "2026-03-26T18:49:41.290296Z", "utilization": 0.78}, {"timestamp": "2026-03-26T19:00:11.404889Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:00:35.691786Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:02:39.494674Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:02:50.773056Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:03:10.759257Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:03:36.904906Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:04:24.574222Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:04:39.015333Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:06:02.030022Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:06:16.353789Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:06:32.622223Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:06:49.065857Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:07:12.850559Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:08:09.906004Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:08:56.474043Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:09:38.278446Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:13:05.593587Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:13:54.985947Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:14:16.785148Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:14:45.698907Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:15:08.691628Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:16:05.632124Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:16:33.190087Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:17:54.783839Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:18:33.502554Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:19:08.762354Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:19:43.093119Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:20:27.774799Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:21:02.800227Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:21:33.45739Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:22:12.765043Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:22:49.571973Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:23:24.193534Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:24:06.096305Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:25:21.769808Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:25:50.426545Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:26:19.60712Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:26:53.613673Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:27:18.85876Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:28:32.242118Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:29:08.774479Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:29:30.369022Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:29:59.254102Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:30:15.476115Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:30:51.123417Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:31:08.945839Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:31:33.764813Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:31:53.621793Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:32:19.780071Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:32:29.356912Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:32:41.777534Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:32:52.977983Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:33:01.851091Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:33:17.001492Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:33:31.826974Z", "utilization": 0.79}, {"timestamp": "2026-03-26T19:34:02.628896Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:34:20.686965Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:34:36.409484Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:34:50.503633Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:35:05.850505Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:35:27.186094Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:35:48.004899Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:36:04.759636Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:36:23.651671Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:36:39.593023Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:36:56.411838Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:37:15.591817Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:37:33.64188Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:37:53.878621Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:38:08.277435Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:38:32.548831Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:38:55.253281Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:39:12.746278Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:39:26.973599Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:39:38.906021Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:39:50.026129Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:40:07.505935Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:40:55.27853Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:41:20.554303Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:41:50.696682Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:43:13.560407Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:43:28.240018Z", "utilization": 0.8}, {"timestamp": "2026-03-26T19:59:43.001009Z", "utilization": 0.8}, {"timestamp": "2026-03-26T20:00:37.700356Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:09:00.065913Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:39:45.990612Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:40:47.724241Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:41:30.728494Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:41:42.236805Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:43:03.645082Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:47:29.795116Z", "utilization": 0.8}, {"timestamp": "2026-03-26T21:53:33.858756Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:54:09.381159Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:54:30.849221Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:54:45.08664Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:55:33.903874Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:55:42.072783Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:55:55.3719Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:56:15.495238Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:56:29.975802Z", "utilization": 0.81}, {"timestamp": "2026-03-26T21:57:05.338807Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:02:52.949808Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:04:28.636462Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:05:44.433724Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:08:56.361366Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:11:50.119858Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:14:55.440815Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:15:39.714898Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:20:50.978562Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:27:24.522609Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:49:58.118199Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:52:57.77062Z", "utilization": 0.81}, {"timestamp": "2026-03-26T22:54:00.292267Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:08:30.687865Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:09:50.221002Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:15:18.206816Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:21:57.766419Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:22:45.717027Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:24:52.650293Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:30:03.574722Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:31:59.814702Z", "utilization": 0.81}, {"timestamp": "2026-03-26T23:35:41.500915Z", "utilization": 0.81}, {"timestamp": "2026-03-27T01:25:56.109767Z", "utilization": 0.81}, {"timestamp": "2026-03-27T01:28:23.869085Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:31:05.280532Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:55:02.493452Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:56:54.869232Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:57:33.118502Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:58:13.15841Z", "utilization": 0.82}, {"timestamp": "2026-03-27T01:59:03.288155Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:00:28.589964Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:01:39.792334Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:02:05.509635Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:02:44.553564Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:03:50.224933Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:04:32.497088Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:05:25.481373Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:06:20.477796Z", "utilization": 0.82}, {"timestamp": "2026-03-27T02:36:57.304287Z", "utilization": 0.82}]};
+
+function buildChart() {
+  const ctx = document.getElementById('utilizationChart');
+  if (!ctx) return;
+
+  const ts5h = DATA.ts_5h || [];
+  const ts7d = DATA.ts_7d || [];
+
+  if (ts5h.length === 0 && ts7d.length === 0) {
+    ctx.parentElement.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 60px 0;">No utilization data available</p>';
+    return;
+  }
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: '5h window',
+          data: ts5h.map(p => ({ x: p.timestamp, y: p.utilization != null ? (p.utilization * 100).toFixed(1) : null })),
+          borderColor: '#7aa2f7',
+          backgroundColor: 'rgba(122, 162, 247, 0.1)',
+          borderWidth: 1.5,
+          pointRadius: ts5h.length < 60 ? 2 : 0,
+          fill: true,
+          tension: 0.1,
+          spanGaps: false,
+        },
+        {
+          label: '7d window',
+          data: ts7d.map(p => ({ x: p.timestamp, y: p.utilization != null ? (p.utilization * 100).toFixed(1) : null })),
+          borderColor: '#bb9af7',
+          backgroundColor: 'rgba(187, 154, 247, 0.1)',
+          borderWidth: 1.5,
+          pointRadius: ts7d.length < 60 ? 2 : 0,
+          fill: true,
+          tension: 0.1,
+          spanGaps: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: {
+            color: '#565f89',
+            maxTicksLimit: 12,
+            maxRotation: 45,
+            callback: function(value, index) {
+              const label = this.getLabelForValue(value);
+              if (!label) return '';
+              return label.substring(5, 16).replace('T', ' ');
+            }
+          },
+          grid: { color: 'rgba(65, 72, 104, 0.3)' },
+        },
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            color: '#565f89',
+            callback: v => v + '%',
+          },
+          grid: { color: 'rgba(65, 72, 104, 0.3)' },
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: '#c0caf5' }
+        },
+        tooltip: {
+          callbacks: {
+            title: function(items) {
+              if (!items.length) return '';
+              const raw = items[0].raw;
+              return raw.x ? raw.x.replace('T', ' ').substring(0, 19) : '';
+            },
+            label: function(item) {
+              return item.dataset.label + ': ' + item.raw.y + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Merge x-axis labels from both series for category scale
+(function() {
+  const ts5h = DATA.ts_5h || [];
+  const ts7d = DATA.ts_7d || [];
+  const allTimestamps = new Set();
+  ts5h.forEach(p => allTimestamps.add(p.timestamp));
+  ts7d.forEach(p => allTimestamps.add(p.timestamp));
+  const sortedLabels = Array.from(allTimestamps).sort();
+
+  // Rebuild data indexed by timestamp for alignment
+  const map5h = {};
+  ts5h.forEach(p => { map5h[p.timestamp] = p.utilization; });
+  const map7d = {};
+  ts7d.forEach(p => { map7d[p.timestamp] = p.utilization; });
+
+  DATA.ts_5h = sortedLabels.map(ts => ({ timestamp: ts, utilization: map5h[ts] ?? null }));
+  DATA.ts_7d = sortedLabels.map(ts => ({ timestamp: ts, utilization: map7d[ts] ?? null }));
+})();
+
+buildChart();
+</script>
+
+</body>
+</html>
