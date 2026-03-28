@@ -1,11 +1,15 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"claude-meter-proxy/internal/capture"
@@ -32,6 +36,7 @@ type Config struct {
 	QueueSize       int
 	PlanTier        string
 	Client          *http.Client
+	AnalysisDir     string
 }
 
 type App struct {
@@ -40,6 +45,8 @@ type App struct {
 	rawWriter        rawWriter
 	normalizedWriter normalizedWriter
 	normalizer       normalizer
+	logDir           string
+	analysisDir      string
 
 	closeOnce sync.Once
 	wg        sync.WaitGroup
@@ -66,12 +73,22 @@ func New(cfg Config) (*App, error) {
 	}
 	norm := normalize.New(cfg.PlanTier)
 
+	if cfg.AnalysisDir != "" {
+		script := filepath.Join(cfg.AnalysisDir, "dashboard.py")
+		if _, err := os.Stat(script); err != nil {
+			log.Printf("claude-meter: dashboard script not found at %s, web dashboard disabled", script)
+			cfg.AnalysisDir = ""
+		}
+	}
+
 	exchanges := make(chan capture.CompletedExchange, cfg.QueueSize)
 	app := &App{
 		exchanges:        exchanges,
 		rawWriter:        rw,
 		normalizedWriter: nw,
 		normalizer:       norm,
+		logDir:           cfg.LogDir,
+		analysisDir:      cfg.AnalysisDir,
 	}
 
 	app.proxy = proxy.New(proxy.Config{
@@ -111,7 +128,29 @@ func (a *App) processExchange(ex capture.CompletedExchange) {
 }
 
 func (a *App) Handler() http.Handler {
-	return a.proxy.Handler()
+	proxyHandler := a.proxy.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if a.analysisDir != "" && r.Method == http.MethodGet && r.URL.Path == "/" && strings.Contains(r.Header.Get("Accept"), "text/html") {
+			a.serveDashboard(w, r)
+			return
+		}
+		proxyHandler.ServeHTTP(w, r)
+	})
+}
+
+func (a *App) serveDashboard(w http.ResponseWriter, r *http.Request) {
+	script := filepath.Join(a.analysisDir, "dashboard.py")
+	cmd := exec.CommandContext(r.Context(), "python3", script, a.logDir, "--output", "-")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		log.Printf("claude-meter: dashboard generation failed: %v\nstderr: %s", err, stderr.String())
+		http.Error(w, "failed to generate dashboard", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(out)
 }
 
 func (a *App) Close() error {

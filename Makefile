@@ -5,10 +5,10 @@ dashboard:
 	python3 analysis/dashboard.py ~/.claude-meter --output /tmp/claude-meter-dashboard/index.html
 	cd /tmp/claude-meter-dashboard && \
 		git init && \
-		git checkout -b gh-pages && \
+		git checkout -B gh-pages && \
 		git add index.html && \
 		git commit -m "Update dashboard $$(date -u +%Y-%m-%dT%H:%M:%SZ)" && \
-		git remote add origin $(REMOTE_URL) && \
+		(git remote get-url origin >/dev/null 2>&1 || git remote add origin $(REMOTE_URL)) && \
 		git push origin gh-pages --force
 
 dashboard-local:

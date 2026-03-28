@@ -240,7 +240,15 @@ python3 analysis/report.py ~/.claude-meter --output /tmp/cm-report
 
 ## Dashboard
 
-Generate an interactive HTML dashboard with Chart.js charts:
+The dashboard is built into the proxy. Just open your browser:
+
+```
+http://localhost:7735
+```
+
+When the proxy is running, visiting that URL in a browser serves a live dashboard with utilization gauges, budget estimates, and time-series charts. API requests from Claude Code continue to proxy normally.
+
+You can also generate a standalone HTML file:
 
 ```bash
 python3 analysis/dashboard.py ~/.claude-meter --output index.html --open

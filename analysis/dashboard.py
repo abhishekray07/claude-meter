@@ -591,13 +591,17 @@ def main():
 
     records = anl.load_records_multi(args.log_dir)
 
-    output_path = Path(args.output)
     if records:
         data = _build_dashboard_data(records)
         html = _generate_html(data)
     else:
         html = _generate_no_data_html()
 
+    if args.output == "-":
+        sys.stdout.write(html)
+        return
+
+    output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html)
     print(f"Dashboard written to {output_path.resolve()}")

@@ -43,6 +43,7 @@ func runStart(args []string) {
 	logDir := startFlags.String("log-dir", defaultLogDir(), "base log directory")
 	queueSize := startFlags.Int("queue-size", 256, "in-memory completed exchange buffer")
 	planTier := startFlags.String("plan-tier", "unknown", "declared plan tier for normalized records")
+	analysisDir := startFlags.String("analysis-dir", "analysis", "path to the analysis/ directory containing dashboard.py")
 	startFlags.Parse(args)
 
 	upstreamURL, err := url.Parse(*upstream)
@@ -55,6 +56,7 @@ func runStart(args []string) {
 		LogDir:          expandHome(*logDir),
 		QueueSize:       *queueSize,
 		PlanTier:        *planTier,
+		AnalysisDir:     *analysisDir,
 	})
 	if err != nil {
 		log.Fatalf("create app: %v", err)
