@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -198,13 +200,17 @@ func (m *mockNormalizer) Normalize(ex capture.CompletedExchange) normalize.Recor
 	return normalize.Record{ID: ex.ID}
 }
 
-func newTestApp(rw rawWriter, nw normalizedWriter, norm normalizer) *App {
+func newTestApp(rw rawWriter, nw normalizedWriter, norm normalizer, logOutput io.Writer) *App {
 	ch := make(chan capture.CompletedExchange, 8)
 	a := &App{
 		exchanges:        ch,
 		rawWriter:        rw,
 		normalizedWriter: nw,
 		normalizer:       norm,
+		logOutput:        logOutput,
+		statusInterval:   100,
+		modelCounts:      make(map[string]uint64),
+		lastUtil:         make(map[string]float64),
 	}
 	a.startBackgroundWriter()
 	return a
@@ -221,7 +227,7 @@ func TestBackgroundWriterLogsWriteError(t *testing.T) {
 	nw := &mockNormalizedWriter{}
 	norm := &mockNormalizer{}
 
-	a := newTestApp(rw, nw, norm)
+	a := newTestApp(rw, nw, norm, io.Discard)
 
 	now := time.Now()
 	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: now}
@@ -263,7 +269,7 @@ func TestBackgroundWriterRecoverFromNormalizePanic(t *testing.T) {
 		},
 	}
 
-	a := newTestApp(rw, nw, norm)
+	a := newTestApp(rw, nw, norm, io.Discard)
 
 	now := time.Now()
 	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: now}
@@ -288,5 +294,272 @@ func TestBackgroundWriterRecoverFromNormalizePanic(t *testing.T) {
 	nw.mu.Unlock()
 	if normCount != 2 {
 		t.Fatalf("normalized writer called %d times, want 2", normCount)
+	}
+}
+
+func TestProcessExchangeLogLine2xx(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{
+		normalizeFn: func(ex capture.CompletedExchange) normalize.Record {
+			return normalize.Record{
+				ID:            ex.ID,
+				Status:        200,
+				ResponseModel: "claude-opus-4-6",
+				Usage: normalize.Usage{
+					InputTokens:         1200,
+					OutputTokens:        450,
+					CacheReadInputTokens: 12800,
+				},
+				Ratelimit: normalize.Ratelimit{
+					Windows: map[string]normalize.RatelimitWindow{
+						"5h": {Utilization: 0.42},
+						"7d": {Utilization: 0.18},
+					},
+				},
+			}
+		},
+	}
+
+	var buf bytes.Buffer
+	a := newTestApp(rw, nw, norm, &buf)
+	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: time.Now()}
+	a.Close()
+
+	output := buf.String()
+	if !strings.Contains(output, "opus-4-6") {
+		t.Errorf("log output missing model name, got: %s", output)
+	}
+	if !strings.Contains(output, "in:1,200") {
+		t.Errorf("log output missing input tokens, got: %s", output)
+	}
+	if !strings.Contains(output, "5h:42%") {
+		t.Errorf("log output missing 5h utilization, got: %s", output)
+	}
+}
+
+func TestProcessExchangeLogLine429(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{
+		normalizeFn: func(ex capture.CompletedExchange) normalize.Record {
+			return normalize.Record{
+				ID:     ex.ID,
+				Status: 429,
+				Ratelimit: normalize.Ratelimit{
+					RetryAfterS: 342,
+					Windows: map[string]normalize.RatelimitWindow{
+						"5h": {Utilization: 1.0},
+					},
+				},
+			}
+		},
+	}
+
+	var buf bytes.Buffer
+	a := newTestApp(rw, nw, norm, &buf)
+	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: time.Now()}
+	a.Close()
+
+	output := buf.String()
+	if !strings.Contains(output, "RATE LIMITED") {
+		t.Errorf("log output missing RATE LIMITED, got: %s", output)
+	}
+	if !strings.Contains(output, "retry-after:342s") {
+		t.Errorf("log output missing retry-after, got: %s", output)
+	}
+}
+
+func TestProcessExchangeLogLineError(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{
+		normalizeFn: func(ex capture.CompletedExchange) normalize.Record {
+			return normalize.Record{
+				ID:            ex.ID,
+				Status:        502,
+				ResponseModel: "claude-sonnet-4-6",
+			}
+		},
+	}
+
+	var buf bytes.Buffer
+	a := newTestApp(rw, nw, norm, &buf)
+	a.exchanges <- capture.CompletedExchange{ID: 1, RequestStartedAt: time.Now()}
+	a.Close()
+
+	output := buf.String()
+	if !strings.Contains(output, "sonnet-4-6") {
+		t.Errorf("log output missing model, got: %s", output)
+	}
+	if !strings.Contains(output, "502") {
+		t.Errorf("log output missing status code, got: %s", output)
+	}
+}
+
+func TestPeriodicStatusLine(t *testing.T) {
+	t.Parallel()
+
+	rw := &mockRawWriter{}
+	nw := &mockNormalizedWriter{}
+	norm := &mockNormalizer{
+		normalizeFn: func(ex capture.CompletedExchange) normalize.Record {
+			return normalize.Record{
+				ID:            ex.ID,
+				Status:        200,
+				ResponseModel: "claude-opus-4-6",
+				Usage:         normalize.Usage{InputTokens: 100, OutputTokens: 50},
+				Ratelimit: normalize.Ratelimit{
+					Windows: map[string]normalize.RatelimitWindow{
+						"5h": {Utilization: 0.42},
+					},
+				},
+			}
+		},
+	}
+
+	var buf bytes.Buffer
+	a := newTestApp(rw, nw, norm, &buf)
+	a.statusInterval = 3 // print summary every 3 requests
+
+	now := time.Now()
+	for i := uint64(1); i <= 5; i++ {
+		a.exchanges <- capture.CompletedExchange{ID: i, RequestStartedAt: now}
+	}
+	a.Close()
+
+	output := buf.String()
+	// Should contain a status line after 3 requests
+	if !strings.Contains(output, "3 requests") {
+		t.Errorf("expected '3 requests' in status line, got: %s", output)
+	}
+	if !strings.Contains(output, "opus") {
+		t.Errorf("expected model name in status line, got: %s", output)
+	}
+}
+
+func TestAPIStatsReturnsJSON(t *testing.T) {
+	t.Parallel()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	upstreamURL, _ := url.Parse(upstream.URL)
+	logDir := t.TempDir()
+
+	// Create a fake normalized JSONL file
+	normDir := filepath.Join(logDir, "normalized")
+	os.MkdirAll(normDir, 0755)
+	record := `{"id":1,"request_timestamp":"2026-03-25T20:00:00Z","response_timestamp":"2026-03-25T20:00:01Z","status":200,"declared_plan_tier":"max_20x","response_model":"claude-opus-4-6","usage":{"input_tokens":100,"output_tokens":50},"ratelimit":{"windows":{"5h":{"utilization":0.1}}}}`
+	os.WriteFile(filepath.Join(normDir, "2026-03-25.jsonl"), []byte(record+"\n"), 0644)
+
+	// Use absolute path to analysis dir so test works from any cwd
+	repoRoot := filepath.Join("..", "..", "analysis")
+	absAnalysis, _ := filepath.Abs(repoRoot)
+	application, err := New(Config{
+		UpstreamBaseURL: upstreamURL,
+		LogDir:          logDir,
+		QueueSize:       4,
+		AnalysisDir:     absAnalysis,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer application.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/api/stats", nil)
+	recorder := httptest.NewRecorder()
+	application.Handler().ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /api/stats status = %d, want 200. Body: %s", recorder.Code, recorder.Body.String())
+	}
+	ct := recorder.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/json") {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+}
+
+func TestAPIStatsNotCapturedByProxy(t *testing.T) {
+	t.Parallel()
+
+	upstreamHit := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	upstreamURL, _ := url.Parse(upstream.URL)
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(logDir, "normalized"), 0755)
+	os.MkdirAll(filepath.Join(logDir, "raw"), 0755)
+
+	application, err := New(Config{
+		UpstreamBaseURL: upstreamURL,
+		LogDir:          logDir,
+		QueueSize:       4,
+		AnalysisDir:     "analysis",
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer application.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/api/stats", nil)
+	recorder := httptest.NewRecorder()
+	application.Handler().ServeHTTP(recorder, req)
+
+	if upstreamHit {
+		t.Error("/api/stats was proxied to upstream — it should be handled locally")
+	}
+}
+
+func TestDashboardServesEmbeddedHTML(t *testing.T) {
+	t.Parallel()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	upstreamURL, _ := url.Parse(upstream.URL)
+	logDir := t.TempDir()
+
+	application, err := New(Config{
+		UpstreamBaseURL: upstreamURL,
+		LogDir:          logDir,
+		QueueSize:       4,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer application.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/", nil)
+	req.Header.Set("Accept", "text/html")
+	recorder := httptest.NewRecorder()
+	application.Handler().ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET / status = %d, want 200", recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "claude-meter") {
+		t.Error("dashboard HTML missing 'claude-meter'")
+	}
+	if !strings.Contains(body, "/api/stats") {
+		t.Error("dashboard HTML missing /api/stats polling reference")
+	}
+	if !strings.Contains(body, "chart.js") {
+		t.Error("dashboard HTML missing Chart.js")
 	}
 }
