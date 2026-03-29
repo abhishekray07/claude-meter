@@ -129,7 +129,10 @@
   <div class="grid">
     <div class="card full">
       <h2>Utilization Over Time</h2>
-      <div class="chart-container"><canvas id="utilizationChart"></canvas></div>
+      <div class="chart-container">
+        <canvas id="utilizationChart"></canvas>
+        <p id="noChartData" style="color: var(--text-muted); text-align: center; padding: 60px 0; display: none;">No utilization data available</p>
+      </div>
     </div>
   </div>
   <div class="grid">
@@ -248,9 +251,12 @@ function updateChart(ts5h, ts7d) {
   if (!ctx) return;
   if (ts5h.length === 0 && ts7d.length === 0) {
     if (chart) { chart.destroy(); chart = null; }
-    ctx.parentElement.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 60px 0;">No utilization data available</p>';
+    ctx.style.display = 'none';
+    document.getElementById('noChartData').style.display = 'block';
     return;
   }
+  ctx.style.display = 'block';
+  document.getElementById('noChartData').style.display = 'none';
 
   const allTs = new Set();
   ts5h.forEach(p => allTs.add(p.timestamp));

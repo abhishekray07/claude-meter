@@ -44,7 +44,7 @@ type Config struct {
 	PlanTier        string
 	Client          *http.Client
 	AnalysisDir     string
-	StatusInterval  int // print status summary every N requests (0 = default 100, -1 = disabled)
+	StatusInterval  int // print status summary every N requests (0 = disabled)
 }
 
 type App struct {
@@ -101,14 +101,7 @@ func New(cfg Config) (*App, error) {
 	}
 
 	exchanges := make(chan capture.CompletedExchange, cfg.QueueSize)
-	var statusInterval uint64
-	if cfg.StatusInterval < 0 {
-		statusInterval = 0 // disabled
-	} else if cfg.StatusInterval == 0 {
-		statusInterval = 100 // default
-	} else {
-		statusInterval = uint64(cfg.StatusInterval)
-	}
+	statusInterval := uint64(cfg.StatusInterval) // 0 = disabled, flag default is 100
 
 	app := &App{
 		exchanges:        exchanges,
