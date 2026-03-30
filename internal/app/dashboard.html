@@ -51,7 +51,7 @@
   .gauge-label { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
   .gauge-bar { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-bottom: 4px; position: relative; }
   .gauge-bar .fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-  .gauge-bar .peak-marker { position: absolute; top: -2px; width: 2px; height: 12px; background: var(--red); border-radius: 1px; transition: left 0.5s ease; }
+  .gauge-bar .peak-marker { position: absolute; top: -2px; width: 2px; height: 12px; background: var(--red); border-radius: 1px; transform: translateX(-50%); transition: left 0.5s ease; }
   .gauge-value { font-size: 28px; font-weight: 700; transition: color 0.3s; }
   .gauge-peak { font-size: 12px; color: var(--text-muted); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -179,6 +179,30 @@ function fmtTokens(n) {
   return n.toString();
 }
 
+function updateGauge(fillId, peakId, valueId, labelId, currentPct, peakPct) {
+  const fill = document.getElementById(fillId);
+  const peak = document.getElementById(peakId);
+  const value = document.getElementById(valueId);
+  const label = document.getElementById(labelId);
+
+  fill.style.width = Math.min(currentPct, 100) + '%';
+  fill.style.background = gaugeColor(currentPct);
+
+  // Only show a separate peak marker when the displayed peak is ahead of the
+  // displayed current utilization. If they overlap, the red marker reads like
+  // an odd cap on the fill bar rather than useful information.
+  if (peakPct > currentPct) {
+    peak.style.display = 'block';
+    peak.style.left = Math.min(peakPct, 100) + '%';
+  } else {
+    peak.style.display = 'none';
+  }
+
+  value.textContent = currentPct + '%';
+  value.className = 'gauge-value ' + gaugeClass(currentPct);
+  label.textContent = 'Peak: ' + peakPct + '%';
+}
+
 function updateDashboard(data) {
   const ts = data.token_summary || {};
   const budget = data.budget_estimates || {};
@@ -198,19 +222,8 @@ function updateDashboard(data) {
   const cur7d = Math.round((w7d.current || 0) * 1000) / 10;
   const peak7d = Math.round((w7d.peak || 0) * 1000) / 10;
 
-  document.getElementById('fill5h').style.width = Math.min(cur5h, 100) + '%';
-  document.getElementById('fill5h').style.background = gaugeColor(cur5h);
-  document.getElementById('peak5h').style.left = Math.min(peak5h, 100) + '%';
-  document.getElementById('val5h').textContent = cur5h + '%';
-  document.getElementById('val5h').className = 'gauge-value ' + gaugeClass(cur5h);
-  document.getElementById('peakLabel5h').textContent = 'Peak: ' + peak5h + '%';
-
-  document.getElementById('fill7d').style.width = Math.min(cur7d, 100) + '%';
-  document.getElementById('fill7d').style.background = gaugeColor(cur7d);
-  document.getElementById('peak7d').style.left = Math.min(peak7d, 100) + '%';
-  document.getElementById('val7d').textContent = cur7d + '%';
-  document.getElementById('val7d').className = 'gauge-value ' + gaugeClass(cur7d);
-  document.getElementById('peakLabel7d').textContent = 'Peak: ' + peak7d + '%';
+  updateGauge('fill5h', 'peak5h', 'val5h', 'peakLabel5h', cur5h, peak5h);
+  updateGauge('fill7d', 'peak7d', 'val7d', 'peakLabel7d', cur7d, peak7d);
 
   document.getElementById('tokInput').textContent = fmt(ts.input_tokens || 0);
   document.getElementById('tokOutput').textContent = fmt(ts.output_tokens || 0);
